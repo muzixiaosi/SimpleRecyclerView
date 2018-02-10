@@ -6,7 +6,6 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -60,6 +59,8 @@ public class MainActivity extends AppCompatActivity {
         });
 
         mLayoutManager = new LinearLayoutManager(this);
+        mLayoutManager.setStackFromEnd(true);//列表再底部开始展示，反转后由上面开始展示
+        mLayoutManager.setReverseLayout(true);//列表翻转
         mLayoutManager.setOrientation(LinearLayoutManager.VERTICAL);
         mRecyclerView.setItemAnimator(new DefaultItemAnimator());
         mRecyclerView.setLayoutManager(mLayoutManager);
@@ -74,18 +75,14 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 List<String> data = new ArrayList<>();
-                for (int i = 0; i < 3; i++) {
+                for (int i = 0; i < 2; i++) {
                     data.add("new李鹏" + i);
                 }
+                int firstVisibleItemPosition = mLayoutManager.findFirstVisibleItemPosition();
+                mAdapter.addInsertHeaderData(data);
 
-                int originDataCount = mAdapter.getItemCount();
-                int lastVisibleItemPosition = mLayoutManager.findLastVisibleItemPosition();
-                Log.i("tag@@", "findLastVisibleItemPosition:" + lastVisibleItemPosition
-                        + "originDataCount:" + originDataCount);
-                mAdapter.addInsertFooterData(data);
-
-                if (lastVisibleItemPosition >= originDataCount-1) {
-                    mRecyclerView.scrollToPosition(mAdapter.getDataCount());
+                if (firstVisibleItemPosition == 0) {
+                    mRecyclerView.scrollToPosition(0);
                 }
             }
         });
@@ -95,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 List<String> data = new ArrayList<>();
-                for (int i = 0; i < 10; i++) {
+                for (int i = 0; i < 5; i++) {
                     data.add("lipeng  " + i);
                 }
                 //刷新数据
@@ -126,7 +123,7 @@ public class MainActivity extends AppCompatActivity {
                     data.add("更多数据 : lipeng  " + (mAdapter.getDataCount() + i));
                 }
                 //刷新数据
-                mAdapter.addInsertHeaderData(data);
+                mAdapter.addInsertFooterData(data);
             }
         }, 1000);
     }

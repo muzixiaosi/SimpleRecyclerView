@@ -5,6 +5,7 @@ import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.StaggeredGridLayoutManager;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.RelativeLayout;
@@ -22,14 +23,14 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
 
     static final int TYPE_COMMON_VIEW = 10001;
     private static final int TYPE_EMPTY_VIEW = 10002;
-    private static final int TYPE_HEADER_VIEW = 20000;
+    private static final int TYPE_FOOTER_VIEW = 20000;
 
     protected final Context mContext;
     private final List<T> mDatas;
     private final boolean mOpenLoadMore;//是否开启加载更多
     private View mEmptyView;//空数据界面View
     private boolean isRemoveEmptyView;//是否移除空界面
-    private RelativeLayout mHeaderLayout;//header view (加载更多)
+    private RelativeLayout mFooterLayout;//header view (加载更多)
     private boolean isAutoLoadMore = false;//是否自动加载，当数据不满一屏幕会自动加载
     private boolean isReset;//开始重新加载数据
     private View mLoadingView; //分页加载中view
@@ -48,11 +49,11 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         ViewHolder vh = null;
         switch (viewType) {
-            case TYPE_HEADER_VIEW:
-                if (mHeaderLayout == null) {
-                    mHeaderLayout = new RelativeLayout(mContext);
+            case TYPE_FOOTER_VIEW:
+                if (mFooterLayout == null) {
+                    mFooterLayout = new RelativeLayout(mContext);
                 }
-                vh = ViewHolder.create(mHeaderLayout);
+                vh = ViewHolder.create(mFooterLayout);
                 break;
             case TYPE_EMPTY_VIEW:
                 vh = ViewHolder.create(mEmptyView);
@@ -66,7 +67,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
         if (mDatas.isEmpty() && mEmptyView != null) {
             return 1;
         }
-        return mDatas.size() + getHeaderCount();
+        return mDatas.size() + getFooterCount();
     }
 
     @Override
@@ -77,38 +78,38 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
             }
             return TYPE_COMMON_VIEW;
         }
-        if (isHeaderView(position)) {
-            return TYPE_HEADER_VIEW;
+        if (isFooterView(position)) {
+            return TYPE_FOOTER_VIEW;
         }
-        return getViewType(position - getHeaderCount(), mDatas.get(position - getHeaderCount()));
+        return getViewType(position, mDatas.get(position));
     }
 
     protected abstract int getViewType(int position, T data);
 
-    public int getHeaderCount() {
-        return mHeaderLayout == null ? 0 : mHeaderLayout.getChildCount();
+    public int getFooterCount() {
+        return mOpenLoadMore && !mDatas.isEmpty() ? 1 : 0;
     }
 
-    private boolean isHeaderView(int position) {
-        return mOpenLoadMore && position < getHeaderCount();
+    private boolean isFooterView(int position) {
+        return mOpenLoadMore && position >= getItemCount() - 1;
     }
 
-    public void addHeaderView(View headerView) {
-        if (headerView == null) {
+    public void addFooterView(View footerView) {
+        if (footerView == null) {
             return;
         }
-        if (mHeaderLayout == null) {
-            mHeaderLayout = new RelativeLayout(mContext);
+        if (mFooterLayout == null) {
+            mFooterLayout = new RelativeLayout(mContext);
         }
-        removeHeaderView();
+        removeFooterView();
         if (mParams == null) {
             mParams = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
-        mHeaderLayout.addView(headerView, mParams);
+        mFooterLayout.addView(footerView, mParams);
     }
 
-    public void removeHeaderView() {
-        mHeaderLayout.removeAllViews();
+    public void removeFooterView() {
+        mFooterLayout.removeAllViews();
     }
 
     /**
@@ -118,7 +119,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
     public void onViewAttachedToWindow(RecyclerView.ViewHolder holder) {
         super.onViewAttachedToWindow(holder);
         int position = holder.getLayoutPosition();
-        if (isHeaderView(position)) {
+        if (isFooterView(position)) {
             ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
             if (lp != null && lp instanceof StaggeredGridLayoutManager.LayoutParams) {
                 StaggeredGridLayoutManager.LayoutParams p = (StaggeredGridLayoutManager.LayoutParams) lp;
@@ -139,7 +140,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
             gridManager.setSpanSizeLookup(new GridLayoutManager.SpanSizeLookup() {
                 @Override
                 public int getSpanSize(int position) {
-                    if (isHeaderView(position)) {
+                    if (isFooterView(position)) {
                         return gridManager.getSpanCount();
                     }
                     return 1;
@@ -153,13 +154,15 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
         if (!mOpenLoadMore || mLoadMoreListener == null) {
             return;
         }
-
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
                 super.onScrollStateChanged(recyclerView, newState);
                 if (newState == RecyclerView.SCROLL_STATE_IDLE) {
-                    if (!isAutoLoadMore && findFirstVisibleItemPosition(layoutManager) == getHeaderCount()) {
+                    Log.w("tag@@", "SCROLL_STATE_IDLE ==> " + "findLastVisibleItemPosition(layoutManager) + 1:"
+                            + findLastVisibleItemPosition(layoutManager) + "   getItemCount():" + getItemCount()
+                            + "   getFooterCount:" + getFooterCount());
+                    if (!isAutoLoadMore && findLastVisibleItemPosition(layoutManager) + 1 == getItemCount() - getFooterCount()) {
                         scrollLoadMore();
                     }
                 }
@@ -168,7 +171,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
-                if (isAutoLoadMore && findFirstVisibleItemPosition(layoutManager) == getHeaderCount()) {
+                if (isAutoLoadMore && findLastVisibleItemPosition(layoutManager) + 1 == getItemCount() - getFooterCount()) {
                     if (mDatas.isEmpty() && mEmptyView != null) {
                         return;
                     }
@@ -180,13 +183,11 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
         });
     }
 
-    private int findFirstVisibleItemPosition(RecyclerView.LayoutManager layoutManager) {
+    private int findLastVisibleItemPosition(RecyclerView.LayoutManager layoutManager) {
         if (layoutManager instanceof LinearLayoutManager) {
-            //return ((LinearLayoutManager) layoutManager).findLastVisibleItemPosition();
-            return ((LinearLayoutManager) layoutManager).findFirstVisibleItemPosition();
+            return ((LinearLayoutManager) layoutManager).findLastVisibleItemPosition();
         } else if (layoutManager instanceof StaggeredGridLayoutManager) {
-            //int[] lastVisibleItemPositions = ((StaggeredGridLayoutManager) layoutManager).findLastVisibleItemPositions(null);
-            int[] lastVisibleItemPositions = ((StaggeredGridLayoutManager) layoutManager).findFirstVisibleItemPositions(null);
+            int[] lastVisibleItemPositions = ((StaggeredGridLayoutManager) layoutManager).findLastVisibleItemPositions(null);
             return Util.findMax(lastVisibleItemPositions);
         }
         return -1;
@@ -196,7 +197,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
         if (isReset) {
             return;
         }
-        if (mHeaderLayout.getChildAt(0) == mLoadingView && !isLoading) {
+        if (mFooterLayout.getChildAt(0) == mLoadingView && !isLoading) {
             if (mLoadMoreListener != null) {
                 isLoading = true;
                 showLoaddingView();
@@ -207,7 +208,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
 
     public void setLoadingView(View loadingView) {
         mLoadingView = loadingView;
-        addHeaderView(mLoadingView);
+        addFooterView(mLoadingView);
     }
 
     public void setLoadingView(int loadingId) {
@@ -233,33 +234,29 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
         notifyDataSetChanged();
     }
 
+    /**
+     * 添加新数据
+     */
     public void addInsertHeaderData(List<T> datas) {
         hideLoaddingView();
         isLoading = false;
-        int size = mDatas.size();
         mDatas.addAll(0, datas);
-
-        notifyDataSetChanged();
-
-
-        //notifyItemInserted(0);
-        //notifyItemRangeInserted(-datas.size() + 1,0);
-
-
-        //notifyItemRangeInserted(0,4);
-        //notifyItemRangeInserted(-datas.size(), 1);
-
+        notifyItemRangeInserted(0, datas.size());
     }
 
+    /**
+     * 添加历史更多数据
+     */
     public void addInsertFooterData(List<T> datas) {
+        hideLoaddingView();
         isLoading = false;
         int size = mDatas.size();
         mDatas.addAll(datas);
-        notifyItemInserted(size + getHeaderCount());
+        notifyItemInserted(size);
     }
 
     protected boolean isCommonItemView(int viewType) {
-        return viewType != TYPE_EMPTY_VIEW && viewType != TYPE_HEADER_VIEW;
+        return viewType != TYPE_EMPTY_VIEW && viewType != TYPE_FOOTER_VIEW;
     }
 
     public void setEmptyView(View emptyView) {
@@ -271,7 +268,7 @@ public abstract class BaseAdapter<T> extends RecyclerView.Adapter<RecyclerView.V
     }
 
     public void loadEnd() {
-        removeHeaderView();
+        removeFooterView();
     }
 
     private void hideLoaddingView() {

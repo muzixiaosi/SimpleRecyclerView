@@ -35,7 +35,7 @@ public abstract class CommonBaseAdapter<T> extends BaseAdapter<T> {
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
         int viewType = holder.getItemViewType();
         if (isCommonItemView(viewType)) {
-            bindCommonItem(holder, position - getHeaderCount());
+            bindCommonItem(holder, position);
         }
     }
 
